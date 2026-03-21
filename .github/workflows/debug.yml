@@ -1,0 +1,50 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Telegram uses several submodules for native libs
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Install Android NDK
+        uses: android-actions/setup-android@v3
+        # Telegram usually requires a specific NDK (currently around r23b - r25c)
+        # The build script typically handles downloading the right version if not found.
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Prepare Local Properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          # You would add telegram.api_id and telegram.api_hash here if building for release
+
+      - name: Build Debug APK
+        run: ./gradlew assembleAfatDebug --stacktrace
+        env:
+          # Optional: Increase memory for the heavy C++ compilation
+          _JAVA_OPTIONS: "-Xmx4g"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telegram-Debug-APK
+          path: TMessagesProj/build/outputs/apk/afat/debug/*.apk
